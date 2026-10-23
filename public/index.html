@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>MAN-HUNT // TACTICAL MULTIPLAYER</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Socket.io client -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- Google Fonts: Space Grotesk & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --lime: #CCFF00;
+      --pink: #FF0055;
+      --cyan: #00F5FF;
+      --amber: #FFB800;
+      --gold: #FFD700;
+    }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background-color: #030407;
+      color: #E6EDF3;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    .font-outfit { font-family: 'Outfit', sans-serif; }
+    .aesthetic-grid {
+      background-image: 
+        radial-gradient(rgba(204, 255, 0, 0.05) 1px, transparent 0),
+        linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 24px 24px, 100% 3px;
+    }
+    .glow-lime { text-shadow: 0 0 16px rgba(204, 255, 0, 0.65); }
+    .glow-pink { text-shadow: 0 0 16px rgba(255, 0, 85, 0.7); }
+    .glow-gold { text-shadow: 0 0 16px rgba(255, 215, 0, 0.8); }
+    .tile-dark { filter: brightness(0.68) invert(100%) contrast(2.4) hue-rotate(195deg) saturate(0.25) !important; }
+    .tile-matrix { filter: invert(100%) hue-rotate(90deg) brightness(0.85) contrast(1.7) !important; }
+    
+    @keyframes redPulse {
+      0%, 100% { box-shadow: inset 0 0 35px rgba(255, 0, 85, 0.8); }
+      50% { box-shadow: inset 0 0 95px rgba(255, 0, 85, 1); }
+    }
+    .proximity-alert { animation: redPulse 0.5s infinite; }
+
+    @keyframes goldPulse {
+      0%, 100% { box-shadow: inset 0 0 35px rgba(255, 215, 0, 0.7); }
+      50% { box-shadow: inset 0 0 85px rgba(255, 215, 0, 1); }
+    }
+    .shield-alert { animation: goldPulse 0.8s infinite; }
+
+    @keyframes boundaryAlarm {
+      0%, 100% { background-color: rgba(255, 0, 85, 0.95); }
+      50% { background-color: rgba(0, 0, 0, 0.95); }
+    }
+    .zone-out-alert { animation: boundaryAlarm 0.6s infinite; }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col select-none overflow-hidden bg-[#030407] text-gray-200">
+
+  <!-- ==================== SCREEN 1: BOLD ENTER INTRO ==================== -->
+  <section id="screen-intro" class="absolute inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-[#030407] aesthetic-grid text-center">
+    <div id="intro-step-1" class="flex flex-col items-center space-y-6">
+      <div class="text-[11px] font-mono tracking-[0.3em] text-[#CCFF00] uppercase opacity-75">
+        SATELLITE TAC-LINK v9.0
+      </div>
+      <button onclick="handleEnterWorld()" class="group relative px-12 py-5 bg-black border-2 border-[#CCFF00] rounded-2xl shadow-[0_0_40px_rgba(204,255,0,0.25)] hover:shadow-[0_0_60px_rgba(204,255,0,0.5)] transition-all active:scale-95">
+        <span class="font-outfit font-black text-5xl md:text-6xl tracking-wider text-[#CCFF00] glow-lime block group-hover:scale-105 transition-transform">
+          ENTER
+        </span>
+        <span class="text-[10px] font-mono text-gray-400 tracking-widest uppercase block mt-1">
+          PRESS TO INITIALIZE FREQUENCY
+        </span>
+      </button>
+    </div>
+
+    <div id="intro-step-2" class="hidden flex-col items-center space-y-5 max-w-sm w-full transition-all">
+      <div class="text-center">
+        <h1 class="font-outfit font-black text-5xl md:text-6xl text-[#CCFF00] tracking-tight glow-lime uppercase">
+          MAN-HUNT
+        </h1>
+        <p id="sub-find-hunt" class="font-outfit font-bold text-xl md:text-2xl text-[#FF0055] tracking-widest uppercase mt-1 opacity-0 transition-opacity duration-500 glow-pink">
+          FIND OR HUNT
+        </p>
+      </div>
+
+      <!-- Rule Book Button -->
+      <div id="rule-btn-container" class="w-full opacity-0 transition-opacity duration-500 pt-1">
+        <button onclick="openRuleBookModal()" class="w-full py-2.5 px-4 bg-[#10131B] border border-[#00F5FF]/60 rounded-xl text-[#00F5FF] font-mono text-xs font-bold uppercase tracking-wider hover:bg-[#00F5FF]/10 active:scale-95 transition-all shadow-[0_0_15px_rgba(0,245,255,0.15)] flex items-center justify-center gap-2">
+          <span>📖</span>
+          <span>EXPANDED RULE BOOK & ABILITIES MANUAL</span>
+        </button>
+      </div>
+
+      <!-- Host / Join Buttons in One Row -->
+      <div id="btn-portal-group" class="w-full grid grid-cols-2 gap-3 opacity-0 transition-opacity duration-500">
+        <button onclick="openHostModal()" class="py-3 px-4 bg-[#101218] border border-gray-700 rounded-xl text-gray-200 font-bold text-xs uppercase tracking-wider hover:border-[#CCFF00] hover:text-[#CCFF00] active:scale-95 transition-all shadow-md">
+          👑 HOST GAME
+        </button>
+        <button onclick="openJoinModal()" class="py-3 px-4 bg-[#101218] border border-gray-700 rounded-xl text-gray-200 font-bold text-xs uppercase tracking-wider hover:border-[#00F5FF] hover:text-[#00F5FF] active:scale-95 transition-all shadow-md">
+          🎮 JOIN GAME
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MODAL: EXPANDED FIELD MANUAL / RULES ==================== -->
+  <div id="modal-rulebook" class="hidden fixed inset-0 z-[350] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="w-full max-w-lg bg-[#0D1017] border-2 border-[#00F5FF] rounded-2xl p-5 flex flex-col space-y-4 max-h-[88vh] overflow-y-auto no-scrollbar shadow-[0_0_35px_rgba(0,245,255,0.25)]">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📖</span>
+          <div>
+            <h3 class="font-outfit text-xl font-black text-white">TACTICAL MANUAL & RULES</h3>
+            <span class="text-[10px] text-[#00F5FF] tracking-widest uppercase">EXPANDED OPERATIONS DOSSIER</span>
+          </div>
+        </div>
+        <button onclick="closeRuleBookModal()" class="text-gray-400 hover:text-white text-base p-1">✕</button>
+      </div>
+
+      <!-- Minimum 5 Players Rule -->
+      <div class="bg-black/60 p-3 rounded-xl border border-yellow-500/50 space-y-1 text-xs">
+        <div class="text-yellow-400 font-bold uppercase flex items-center gap-1.5">
+          <span>👥</span>
+          <span>MINIMUM 5 OPERATIVES REQUIRED</span>
+        </div>
+        <p class="text-gray-300">
+          The match session cannot be started by the host until at least <b>5 players</b> have connected into the room lobby (supports up to 20 players max).
+        </p>
+      </div>
+
+      <!-- Out-of-Zone Mandatory Penalty -->
+      <div class="bg-black/60 p-3 rounded-xl border border-red-500/50 space-y-1 text-xs">
+        <div class="text-red-400 font-bold uppercase flex items-center gap-1.5">
+          <span>🚨</span>
+          <span>MANDATORY OUT-OF-ZONE ELIMINATION</span>
+        </div>
+        <p class="text-gray-300">
+          Players are confined inside the Play Boundary Circle. <b>This rule cannot be disabled.</b> If you leave the zone, an emergency countdown siren fires. You must step back inside within your grace period (e.g. 10s) or you are officially eliminated!
+        </p>
+      </div>
+
+      <!-- 4 Seeker Abilities Fully Explained -->
+      <div class="bg-black/60 p-3 rounded-xl border border-[#FF0055]/50 space-y-2 text-xs">
+        <div class="text-[#FF0055] font-bold uppercase flex items-center gap-1.5">
+          <span>👁️</span>
+          <span>SEEKER ARSENAL (4 DISTINCT ABILITIES)</span>
+        </div>
+        <div class="space-y-1.5 text-gray-300 text-[11px]">
+          <p>• <b>UAV Satellite Sweep:</b> Triggers an instant orbital radar unmask revealing all hiders across the map for 10 seconds.</p>
+          <p>• <b>Acoustic Sonar Flare:</b> Emits high-frequency ultrasonic waves detecting any runner within a 70m radius.</p>
+          <p>• <b>Overdrive Speed Burst:</b> Temporarily boosts your tagging/capture radius by +10 meters for quick sprint catches.</p>
+          <p>• <b>EMP Radar Scrambler:</b> Emits electromagnetic interference that jams and disables all hiders' proximity sensors for 25 seconds.</p>
+        </div>
+      </div>
+
+      <!-- 4 Hider Abilities Fully Explained -->
+      <div class="bg-black/60 p-3 rounded-xl border border-[#CCFF00]/50 space-y-2 text-xs">
+        <div class="text-[#CCFF00] font-bold uppercase flex items-center gap-1.5">
+          <span>👻</span>
+          <span>HIDER ARSENAL (4 DISTINCT ABILITIES)</span>
+        </div>
+        <div class="space-y-1.5 text-gray-300 text-[11px]">
+          <p>• <b>Ghost Cloak:</b> Enters complete thermal stealth, shielding you from the next 3-minute satellite pulse sweep.</p>
+          <p>• <b>Decoy Beacon:</b> Spawns a false telemetry pin 100 meters away from your location to misdirect hunting seekers.</p>
+          <p>• <b>Sixth Sense:</b> Warns you of the exact compass direction from which a seeker is approaching.</p>
+          <p>• <b>Smoke Haze Obfuscation:</b> Blurs your radar marker into a 100m haze circle so seekers cannot pinpoint your exact building or doorway.</p>
+        </div>
+      </div>
+
+      <!-- Guardian Angel & Spectator Shield -->
+      <div class="bg-black/60 p-3 rounded-xl border border-[#FFD700]/50 space-y-1 text-xs">
+        <div class="text-[#FFD700] font-bold uppercase flex items-center gap-1.5">
+          <span>👼</span>
+          <span>GUARDIAN ANGEL ROLE & 60s REVIVE SHIELD</span>
+        </div>
+        <p class="text-gray-300">
+          Up to 2 Hiders (or eliminated spectators) can trigger the <b>Guardian Angel Shield</b>. If a teammate is trapped in the danger zone, activating it grants them a golden aura and <b>60 seconds of complete immunity</b>, blocking seekers from eliminating them for a full minute!
+        </p>
+      </div>
+
+      <button onclick="closeRuleBookModal()" class="w-full py-3 bg-[#00F5FF] text-black font-outfit font-black text-xs uppercase rounded-xl hover:bg-white transition-all">
+        ACKNOWLEDGED // CLOSE
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 2: COMPLETE RESTORED HOST SETUP MODAL ==================== -->
+  <div id="modal-host" class="hidden fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 font-mono text-xs">
+    <div class="w-full max-w-lg bg-[#0B0E14] border border-gray-800 rounded-2xl p-4 flex flex-col space-y-3 max-h-[92vh] overflow-y-auto no-scrollbar shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+        <div>
+          <span class="text-[10px] text-[#CCFF00] tracking-widest uppercase block">HOST CONTROLS</span>
+          <h2 class="font-outfit text-xl font-black text-white">Manhunt • SETUP</h2>
+        </div>
+        <button onclick="closeHostModal()" class="text-gray-400 hover:text-white text-base p-1">✕</button>
+      </div>
+
+      <!-- Host Callsign -->
+      <div class="space-y-1">
+        <label class="text-[10px] text-gray-400 uppercase">HOST CALLSIGN</label>
+        <input id="host-callsign" type="text" value="GHOST_VIPUL" maxlength="14" class="w-full bg-[#05070B] border border-gray-700 rounded-lg px-3 py-2 text-sm text-[#CCFF00] font-mono focus:outline-none focus:border-[#CCFF00]">
+      </div>
+
+      <!-- Role Preference -->
+      <div class="space-y-1">
+        <label class="text-[10px] text-gray-400 uppercase">YOUR ROLE PREFERENCE</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="role-pick-hider" onclick="setRole('hider')" class="py-2.5 rounded-lg border-2 border-[#CCFF00] bg-[#CCFF00]/10 text-[#CCFF00] font-bold uppercase flex items-center justify-center gap-1.5">
+            <span>👻</span><span>HIDER</span>
+          </button>
+          <button id="role-pick-seeker" onclick="setRole('seeker')" class="py-2.5 rounded-lg border border-gray-700 bg-black text-gray-400 font-bold uppercase flex items-center justify-center gap-1.5">
+            <span>👁️</span><span>SEEKER</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TEAM DISTRIBUTION & AUTO-ASSIGN (MAX 20) (Matched to Screenshot 29) -->
+      <div class="p-3 bg-[#070A0F] border border-[#00F5FF]/40 rounded-xl space-y-2.5">
+        <div class="flex items-center gap-1.5 text-[#00F5FF] font-bold text-[11px] uppercase">
+          <span>👥</span><span>TEAM DISTRIBUTION & AUTO-ASSIGN (MAX 20)</span>
+        </div>
+
+        <div class="p-2.5 bg-black/60 rounded-lg border border-gray-800 flex justify-between items-center text-xs">
+          <span class="text-gray-400">CURRENT ROSTER:</span>
+          <div class="flex items-center gap-2">
+            <span class="text-[#FF0055] font-black"><span id="lbl-roster-seekers">2</span> SEEKERS</span>
+            <span class="text-gray-500">vs</span>
+            <span class="text-[#CCFF00] font-black"><span id="lbl-roster-hiders">18</span> HIDERS</span>
+            <span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px]">20/20</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Seekers Stepper -->
+          <div class="p-2 bg-black/80 rounded-lg border border-gray-800 space-y-1">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-gray-300">👁️ SEEKERS</span>
+              <span class="text-[#FF0055] font-bold">MAX 5</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <button onclick="adjustSeekers(-1)" class="w-8 h-8 rounded bg-gray-800 text-white font-black hover:bg-gray-700">-</button>
+              <span id="stepper-seeker-count" class="font-outfit font-black text-lg text-[#FF0055]">2</span>
+              <button onclick="adjustSeekers(1)" class="w-8 h-8 rounded bg-gray-800 text-white font-black hover:bg-gray-700">+</button>
+            </div>
+          </div>
+
+          <!-- Hiders Stepper -->
+          <div class="p-2 bg-black/80 rounded-lg border border-gray-800 space-y-1">
+            <div class="flex justify-between items-center text-[10px]">
+              <span class="text-gray-300">👻 HIDERS</span>
+              <span class="text-[#CCFF00] font-bold">REMAINING</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <button onclick="adjustSeekers(1)" class="w-8 h-8 rounded bg-gray-800 text-white font-black hover:bg-gray-700">-</button>
+              <span id="stepper-hider-count" class="font-outfit font-black text-lg text-[#CCFF00]">18</span>
+              <button onclick="adjustSeekers(-1)" class="w-8 h-8 rounded bg-gray-800 text-white font-black hover:bg-gray-700">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Auto-Select Banner -->
+        <div class="p-2.5 bg-[#00F5FF]/10 border border-[#00F5FF] rounded-lg flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🎲</span>
+            <div>
+              <div class="text-[11px] font-bold text-[#00F5FF] uppercase">AUTO-SELECT & RANDOMIZE: ACTIVE</div>
+              <div class="text-[9px] text-gray-300">SYSTEM ASSIGNS <span id="auto-seeker-lbl">2</span> SEEKERS & <span id="auto-hider-lbl">18</span> HIDERS ON JOIN</div>
+            </div>
+          </div>
+          <span class="px-2 py-1 bg-[#00F5FF] text-black font-black text-[10px] rounded uppercase">LOCKED</span>
+        </div>
+      </div>
+
+      <!-- CATCHING & FAIR PLAY (Matched to Screenshot 32) -->
+      <div class="p-3 bg-[#070A0F] border border-gray-800 rounded-xl space-y-2">
+        <span class="text-gray-400 font-bold text-[11px] block">Catching & fair play</span>
+        
+        <div>
+          <label class="text-[10px] text-gray-400">Catch method</label>
+          <select id="cfg-catch-method" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+            <option value="direct">Direct Tag (instant tap)</option>
+            <option value="photo">Photo Proof (upload face/body)</option>
+            <option value="auto">Automatic (proximity)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Catch radius (m)</label>
+          <input id="cfg-catch-radius" type="number" value="10" min="3" max="50" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[11px] text-gray-300">Runners can self-report caught</span>
+          <input type="checkbox" id="cfg-self-report" checked class="w-4 h-4 accent-[#00F5FF]">
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Ignore GPS worse than (m)</label>
+          <input id="cfg-gps-filter" type="number" value="75" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Max speed m/s (0 = off)</label>
+          <input id="cfg-max-speed" type="number" value="0" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <div>
+            <span class="text-[11px] text-gray-300 block">Practice mode (tap map to move)</span>
+            <span class="text-[9px] text-gray-500">For testing indoors. Leave off for real games.</span>
+          </div>
+          <input type="checkbox" id="cfg-practice-mode" checked class="w-4 h-4 accent-[#CCFF00]">
+        </div>
+      </div>
+
+      <!-- VISIBILITY (Matched to Screenshot 31) -->
+      <div class="p-3 bg-[#070A0F] border border-gray-800 rounded-xl space-y-2">
+        <span class="text-gray-400 font-bold text-[11px] block">Visibility</span>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Hunters seen by runners</label>
+          <select id="cfg-hunters-seen" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+            <option value="hidden" selected>Hidden</option>
+            <option value="periodic">Periodic ping</option>
+            <option value="always">Always</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Runners seen by hunters</label>
+          <select id="cfg-runners-seen" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+            <option value="periodic" selected>Periodic ping (3 mins)</option>
+            <option value="hidden">Hidden</option>
+            <option value="always">Always</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Ping interval (sec)</label>
+          <input id="cfg-ping-interval" type="number" value="180" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[11px] text-gray-300">Teammates see each other</span>
+          <input type="checkbox" id="cfg-teammates-see" checked class="w-4 h-4 accent-[#00F5FF]">
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[11px] text-gray-300">Spectators / caught players see everyone</span>
+          <input type="checkbox" id="cfg-spectators-see" checked class="w-4 h-4 accent-[#00F5FF]">
+        </div>
+      </div>
+
+      <!-- PLAY AREA & OUT-OF-ZONE (Matched to Screenshot 30, Out of Zone Mandatory) -->
+      <div class="p-3 bg-[#070A0F] border border-red-500/40 rounded-xl space-y-2">
+        <div class="flex justify-between items-center">
+          <span class="text-gray-300 font-bold text-[11px]">Play area</span>
+          <span class="text-[9px] text-red-400 font-bold bg-red-950/60 px-1.5 py-0.5 rounded border border-red-800">BOUNDARY ACTIVE</span>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Radius (m)</label>
+          <input id="cfg-zone-radius" type="number" value="500" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+        </div>
+
+        <p class="text-[10px] text-gray-400 leading-tight">No centre set — the host's location is auto-detected when game starts.</p>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="detectHostGPS()" class="p-2 bg-black border border-gray-700 rounded text-gray-200 text-[10px] hover:border-white">
+            📍 Use my location
+          </button>
+          <button type="button" onclick="alert('Center will lock on host upon match launch.')" class="p-2 bg-black border border-gray-700 rounded text-gray-200 text-[10px] hover:border-white">
+            🗺️ Pick on map
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[11px] text-gray-300">Shrinking zone</span>
+          <input type="checkbox" id="cfg-shrinking-zone" class="w-4 h-4 accent-[#00F5FF]">
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Leaving the zone (MANDATORY PENALTY)</label>
+          <select id="cfg-leaving-zone" class="w-full bg-black border border-red-800 rounded p-2 text-red-400 mt-0.5 font-bold">
+            <option value="countdown" selected>Eliminate after grace period (Mandatory)</option>
+            <option value="instant">Instant eliminate</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-gray-400">Grace period (sec) [CANNOT BE OFF]</label>
+          <select id="cfg-grace-period" class="w-full bg-black border border-gray-700 rounded p-2 text-white mt-0.5">
+            <option value="10" selected>10 seconds (Standard)</option>
+            <option value="20">20 seconds</option>
+            <option value="30">30 seconds</option>
+            <option value="45">45 seconds</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SEPARATE 4+4 ABILITIES WITH INDIVIDUAL ON/OFF TOGGLES -->
+      <div class="p-3 bg-[#070A0F] border border-gray-800 rounded-xl space-y-3">
+        <span class="text-gray-300 font-bold text-[11px] block">Abilities (0 uses = unlimited)</span>
+
+        <!-- Seeker 4 Abilities -->
+        <div class="space-y-1.5 p-2 bg-[#12080D] rounded-lg border border-[#FF0055]/40">
+          <span class="text-[#FF0055] font-bold text-[10px] uppercase block">👁️ SEEKER ARSENAL (4 PERKS)</span>
+          
+          <div class="flex items-center justify-between text-[11px]">
+            <span>🛰️ UAV Satellite Sweep</span>
+            <input type="checkbox" id="toggle-pow-uav" checked class="w-4 h-4 accent-[#FF0055]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>📡 Acoustic Sonar Flare (70m)</span>
+            <input type="checkbox" id="toggle-pow-sonar" checked class="w-4 h-4 accent-[#FF0055]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>⚡ Overdrive (+10m tag radius)</span>
+            <input type="checkbox" id="toggle-pow-overdrive" checked class="w-4 h-4 accent-[#FF0055]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>⚡ EMP Radar Scrambler</span>
+            <input type="checkbox" id="toggle-pow-emp" checked class="w-4 h-4 accent-[#FF0055]">
+          </div>
+        </div>
+
+        <!-- Hider 4 Abilities -->
+        <div class="space-y-1.5 p-2 bg-[#0A1208] rounded-lg border border-[#CCFF00]/40">
+          <span class="text-[#CCFF00] font-bold text-[10px] uppercase block">👻 HIDER ARSENAL (4 PERKS)</span>
+
+          <div class="flex items-center justify-between text-[11px]">
+            <span>👻 Ghost Cloak (Pulse immunity)</span>
+            <input type="checkbox" id="toggle-pow-cloak" checked class="w-4 h-4 accent-[#CCFF00]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>📍 Decoy Telemetry Beacon</span>
+            <input type="checkbox" id="toggle-pow-decoy" checked class="w-4 h-4 accent-[#CCFF00]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>🧭 Sixth Sense Compass</span>
+            <input type="checkbox" id="toggle-pow-sense" checked class="w-4 h-4 accent-[#CCFF00]">
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <span>🌫️ Smoke Haze Obfuscation</span>
+            <input type="checkbox" id="toggle-pow-smoke" checked class="w-4 h-4 accent-[#CCFF00]">
+          </div>
+        </div>
+
+        <!-- Guardian & Infected -->
+        <div class="flex items-center justify-between pt-1 border-t border-gray-800">
+          <div>
+            <span class="text-[#FFD700] font-bold block">👼 GUARDIAN ANGEL ROLE (MAX 2)</span>
+            <span class="text-[9px] text-gray-500">60s Revive Shield intervention</span>
+          </div>
+          <input type="checkbox" id="toggle-guardian-role" checked class="w-4 h-4 accent-[#FFD700]">
+        </div>
+
+        <div class="flex items-center justify-between pt-1 border-t border-gray-800">
+          <div>
+            <span class="text-[#FF0055] font-bold block">☣️ INFECTED MODE (MAX 2 SEEKERS)</span>
+            <span class="text-[9px] text-gray-500">Caught hiders become seekers</span>
+          </div>
+          <input type="checkbox" id="toggle-infected-mode" class="w-4 h-4 accent-[#FF0055]">
+        </div>
+      </div>
+
+      <button onclick="createRoomOnServer()" class="w-full py-3.5 bg-[#CCFF00] hover:bg-white text-black font-outfit font-black text-sm uppercase rounded-xl transition-all shadow-lg active:scale-95">
+        CREATE ROOM & GENERATE INVITE LINK ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 3: INVITE LOBBY MODAL (Enforces >= 5 Players) ==================== -->
+  <div id="modal-invite" class="hidden fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#0D1017] border border-[#CCFF00]/40 rounded-2xl p-5 flex flex-col space-y-4 shadow-[0_0_40px_rgba(204,255,0,0.15)]">
+      <div class="text-center space-y-1">
+        <span class="text-[10px] font-mono text-[#00F5FF] tracking-widest uppercase">MATCH LOBBY ONLINE</span>
+        <h3 class="font-outfit text-2xl font-black text-white">INVITE SQUAD</h3>
+        <p class="text-xs text-gray-400">Share this link with your friends on WhatsApp to join.</p>
+      </div>
+
+      <div class="bg-black border border-gray-700 rounded-xl p-3 space-y-2">
+        <div class="flex items-center justify-between text-[11px] font-mono">
+          <span class="text-gray-400">ROOM: <b class="text-white text-sm" id="invite-room-code">CAMPUS-9412</b></span>
+          <span id="lobby-readiness-tag" class="text-yellow-400 font-bold">WAITING (MIN 5 REQUIRED)</span>
+        </div>
+        <div class="flex gap-2">
+          <input id="invite-link-input" type="text" readonly value="" class="flex-1 bg-[#10131B] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-300 font-mono select-all focus:outline-none">
+          <button onclick="copyInviteLink()" id="btn-copy-link" class="px-3 py-1.5 bg-[#CCFF00] text-black font-bold text-xs uppercase rounded-lg hover:bg-white transition-all">
+            COPY
+          </button>
+        </div>
+      </div>
+
+      <button onclick="shareViaWhatsApp()" class="w-full py-2.5 bg-[#25D366] text-black font-bold text-xs uppercase rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-all font-mono">
+        📲 SHARE VIA WHATSAPP
+      </button>
+
+      <div class="bg-[#121622] p-3 rounded-xl border border-gray-800 space-y-2">
+        <div class="flex justify-between items-center text-xs font-mono">
+          <span class="text-gray-300">CONNECTED OPERATIVES:</span>
+          <span id="lobby-player-count" class="font-bold text-[#CCFF00]">1 / 20</span>
+        </div>
+        <div id="lobby-avatars" class="flex flex-wrap gap-1.5 pt-1"></div>
+      </div>
+
+      <!-- Start Match Button (Enforces >= 5 players) -->
+      <button id="btn-start-match" onclick="requestStartGame()" class="w-full py-3.5 bg-gray-700 text-gray-400 font-outfit font-black text-sm uppercase rounded-xl transition-all shadow-md active:scale-95 cursor-not-allowed">
+        WAITING FOR 5 PLAYERS (1/5)
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 4: JOIN ROOM MODAL ==================== -->
+  <div id="modal-join" class="hidden fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-[#0D1017] border border-gray-800 rounded-2xl p-5 flex flex-col space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+        <h3 class="font-outfit text-lg font-black text-white">JOIN ROOM</h3>
+        <button onclick="closeJoinModal()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+
+      <div class="space-y-2 font-mono text-xs">
+        <label class="text-gray-400">ROOM CODE</label>
+        <input id="join-room-code" type="text" placeholder="CAMPUS-9412" class="w-full bg-black border border-gray-700 rounded-lg p-2.5 text-xs text-[#00F5FF] uppercase focus:outline-none focus:border-[#00F5FF]">
+
+        <label class="text-gray-400 pt-1 block">YOUR CALLSIGN</label>
+        <input id="join-callsign" type="text" value="AGENT_SHADOW" maxlength="14" class="w-full bg-black border border-gray-700 rounded-lg p-2.5 text-xs text-[#CCFF00] focus:outline-none focus:border-[#CCFF00]">
+      </div>
+
+      <button onclick="submitJoinServer()" class="w-full py-3 bg-[#00F5FF] hover:bg-white text-black font-outfit font-black text-xs uppercase rounded-xl transition-all">
+        ENTER ROOM LOBBY ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== SCREEN 5: IN-GAME HUD & LEAFLET RADAR ==================== -->
+  <section id="screen-game" class="absolute inset-0 z-30 flex flex-col hidden">
+    <header class="h-14 bg-[#080B10]/95 backdrop-blur-md border-b border-gray-800/80 flex items-center justify-between px-3 z-30">
+      <div class="flex items-center gap-2">
+        <div id="hud-role-pill" class="text-[11px] px-2.5 py-1 bg-[#CCFF00] text-black font-outfit font-black tracking-wider uppercase rounded-md shadow-sm">
+          HIDER
+        </div>
+        <div class="font-mono text-xs">
+          <span class="text-gray-400 text-[10px] block leading-none">ELIMINATED</span>
+          <span id="hud-elim-counter" class="font-bold text-[#FF0055] text-sm leading-tight">0 CATCHES</span>
+        </div>
+      </div>
+
+      <!-- Center: Map Switcher, Rules, and Host Pause/Resume Button -->
+      <div class="flex items-center gap-1.5">
+        <div class="flex items-center bg-[#030407] border border-gray-800 rounded-lg p-0.5">
+          <button onclick="changeMapStyle('dark')" id="map-btn-dark" class="px-2 py-1 text-[10px] font-mono font-bold rounded bg-[#CCFF00] text-black">DARK</button>
+          <button onclick="changeMapStyle('sat')" id="map-btn-sat" class="px-2 py-1 text-[10px] font-mono text-gray-400 rounded hover:text-white">SAT</button>
+          <button onclick="changeMapStyle('streets')" id="map-btn-streets" class="px-2 py-1 text-[10px] font-mono text-gray-400 rounded hover:text-white">OSM</button>
+          <button onclick="changeMapStyle('matrix')" id="map-btn-matrix" class="px-2 py-1 text-[10px] font-mono text-[#00F5FF] rounded hover:text-white">MATRIX</button>
+        </div>
+        
+        <button onclick="openRuleBookModal()" class="p-1 px-2 bg-[#121622] border border-[#00F5FF]/50 rounded-lg text-[#00F5FF] text-[10px] font-mono font-bold hover:bg-[#00F5FF]/20">
+          📖 RULES
+        </button>
+
+        <!-- In-game Pause/Resume Button (Host only) -->
+        <button id="btn-host-pause" onclick="togglePauseGame()" class="hidden p-1 px-2.5 bg-[#FFB800] text-black text-[10px] font-mono font-black rounded-lg hover:bg-white transition-all shadow-md">
+          ⏸️ PAUSE
+        </button>
+      </div>
+
+      <div class="flex items-center gap-1.5 bg-[#10141E] px-2 py-1 rounded-md border border-gray-800">
+        <span id="pulse-dot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <div class="font-mono text-right">
+          <span class="text-[9px] text-gray-400 block leading-none">PULSE</span>
+          <span id="pulse-countdown" class="text-xs font-bold text-[#FFB800] leading-none">03:00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAUSED MATCH BANNER -->
+    <div id="pause-overlay-banner" class="hidden absolute top-16 inset-x-3 z-[1800] p-3 rounded-xl bg-yellow-500 text-black border-2 border-white shadow-2xl flex items-center justify-between font-mono animate-pulse">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl font-black">⏸️</span>
+        <div>
+          <div class="text-xs font-black uppercase">MATCH TEMPORARILY PAUSED</div>
+          <div class="text-[10px]">All movements & eliminations frozen by host.</div>
+        </div>
+      </div>
+      <span class="text-[10px] font-bold px-2 py-0.5 bg-black text-yellow-400 rounded">HOLD POSITION</span>
+    </div>
+
+    <!-- OUT-OF-ZONE 10-SECOND COUNTDOWN WARNING BANNER -->
+    <div id="zone-warning-banner" class="hidden absolute top-16 inset-x-3 z-[1700] p-3 rounded-xl border-2 border-white shadow-[0_0_35px_#FF0055] flex items-center justify-between zone-out-alert text-white font-mono">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl animate-spin">⚠️</span>
+        <div>
+          <div class="text-xs font-black uppercase tracking-wider">OUTSIDE PLAY BOUNDARY!</div>
+          <div class="text-[11px] text-yellow-300">RETURN IN <b id="zone-countdown-sec" class="text-xl text-white underline">10</b>s OR BE ELIMINATED!</div>
+        </div>
+      </div>
+      <span class="text-xs font-bold px-2.5 py-1 bg-black/60 rounded border border-white">TURN BACK</span>
+    </div>
+
+    <!-- SEEKER TARGET LOCK BANNER (DIRECT TAG vs PHOTO) -->
+    <div id="seeker-target-banner" class="hidden absolute top-16 inset-x-3 z-[1600] bg-[#FF0055] text-white p-3 rounded-xl border-2 border-white shadow-[0_0_30px_#FF0055] flex items-center justify-between animate-bounce">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl animate-spin">🎯</span>
+        <div>
+          <div class="text-xs font-outfit font-black tracking-wide uppercase">TARGET IN SIGHT (IN RANGE)!</div>
+          <div id="seeker-target-name" class="text-[11px] font-mono text-yellow-200">YOU FOUND: AGENT_SHADOW (~7m)</div>
+          <div id="seeker-target-immune-badge" class="hidden text-[10px] font-mono text-white bg-black/60 px-1.5 py-0.5 rounded mt-0.5">
+            ⚠️ SHIELDED BY GUARDIAN ANGEL (IMMUNE FOR 45s)!
+          </div>
+        </div>
+      </div>
+      
+      <button onclick="handleSeekerAction()" id="btn-seeker-action" class="px-3 py-2 bg-white text-black font-mono font-black text-xs uppercase rounded-lg shadow-lg hover:bg-[#CCFF00] active:scale-95 transition-all">
+        ⚡ DIRECT ELIMINATE
+      </button>
+    </div>
+
+    <!-- HIDER PROXIMITY ALERT (<50m) -->
+    <div id="proximity-banner" class="hidden absolute top-16 inset-x-3 z-[1500] bg-[#FF0055] text-white px-3 py-2 rounded-xl border border-white/40 shadow-[0_0_25px_#FF0055] flex items-center justify-between animate-bounce">
+      <div class="flex items-center gap-2">
+        <span class="text-lg">⚠️</span>
+        <div>
+          <div class="text-xs font-outfit font-black tracking-wide uppercase">SEEKER IN PROXIMITY!</div>
+          <div id="proximity-distance-label" class="text-[10px] font-mono text-yellow-200">SEEKER IS ~38m AWAY! RUN!</div>
+        </div>
+      </div>
+      <span class="text-[10px] font-mono font-bold px-2 py-0.5 bg-black/50 rounded border border-white/40">EVADE</span>
+    </div>
+
+    <!-- GUARDIAN ANGEL ACTIVE SHIELD BANNER -->
+    <div id="hider-shield-banner" class="hidden absolute top-16 inset-x-3 z-[1550] bg-[#FFD700] text-black p-2.5 rounded-xl border-2 border-white shadow-[0_0_30px_#FFD700] flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">👼</span>
+        <div>
+          <div class="text-xs font-outfit font-black uppercase">GUARDIAN SHIELD ACTIVE!</div>
+          <div class="text-[10px] font-mono font-bold">IMMUNE FROM SEEKER TAGS FOR: <span id="shield-timer-label">60s</span></div>
+        </div>
+      </div>
+      <span class="text-[10px] font-mono bg-black text-[#FFD700] px-2 py-1 rounded font-bold">INVULNERABLE</span>
+    </div>
+
+    <!-- MAIN LEAFLET RADAR CANVAS -->
+    <div id="leaflet-map" class="flex-1 w-full h-full relative z-10 bg-[#050608]"></div>
+
+    <!-- Recenter GPS Button -->
+    <button onclick="recenterGPS()" class="absolute right-3 bottom-24 z-20 p-2.5 bg-[#0D1017]/90 border border-gray-700 rounded-xl text-white text-xs font-mono shadow-xl active:scale-95">
+      🎯 RECENTER
+    </button>
+
+    <!-- GUARDIAN ANGEL INTERVENTION BUTTON -->
+    <div id="guardian-action-dock" class="hidden absolute top-32 right-3 z-30 flex flex-col gap-1 items-end pointer-events-auto">
+      <button onclick="triggerGuardianShield()" id="btn-angel-shield" class="p-2.5 bg-[#FFD700] text-black font-outfit font-black text-xs uppercase rounded-xl border-2 border-white shadow-[0_0_20px_#FFD700] active:scale-95 animate-pulse flex items-center gap-1.5">
+        <span>👼</span>
+        <span>SHIELD & REVIVE TEAMMATE</span>
+      </button>
+      <span class="text-[9px] font-mono text-[#FFD700] bg-black/80 px-2 py-0.5 rounded border border-[#FFD700]/40">BLOCKS SEEKER FOR 1 MIN</span>
+    </div>
+
+    <!-- FLOATING BOTTOM DOCK -->
+    <div class="absolute bottom-3 inset-x-3 z-30 flex flex-col gap-2 pointer-events-none">
+      <div class="flex justify-between items-end pointer-events-auto">
+        <div class="w-36 flex flex-col gap-1">
+          <button id="btn-ptt-mic"
+                  onmousedown="startVoice()"
+                  onmouseup="stopVoice()"
+                  ontouchstart="startVoice(event)"
+                  ontouchend="stopVoice(event)"
+                  class="w-full py-2.5 px-2 bg-[#0D1017]/90 backdrop-blur-md border border-[#CCFF00] rounded-xl text-[#CCFF00] font-mono text-xs font-black uppercase flex items-center justify-center gap-1.5 shadow-lg active:scale-95 select-none">
+            <span>🎙️</span>
+            <span id="ptt-label">PTT MIC</span>
+          </button>
+          <div class="text-[9px] font-mono text-center text-gray-400 bg-black/70 rounded py-0.5 border border-gray-800">
+            <span id="hud-channel-tag" class="text-[#CCFF00]">FREQ: SQUAD</span>
+          </div>
+        </div>
+
+        <div class="flex gap-1.5">
+          <button id="dock-btn-tasks" onclick="toggleTasksDrawer()" class="py-2.5 px-3 bg-[#0D1017]/90 backdrop-blur-md border border-[#00F5FF] text-[#00F5FF] rounded-xl font-mono text-xs font-bold uppercase shadow-lg active:scale-95 flex items-center gap-1">
+            <span>📋</span>
+            <span id="dock-task-text">TASKS (0/2)</span>
+          </button>
+
+          <button id="dock-btn-powers" onclick="togglePowersDrawer()" class="py-2.5 px-3 bg-[#0D1017]/90 backdrop-blur-md border border-[#FFB800] text-[#FFB800] rounded-xl font-mono text-xs font-bold uppercase shadow-lg active:scale-95">
+            ⚡ POWERS
+          </button>
+
+          <button onclick="togglePlayersDrawer()" class="py-2.5 px-3 bg-[#0D1017]/90 backdrop-blur-md border border-gray-700 text-gray-300 rounded-xl font-mono text-xs font-bold uppercase shadow-lg active:scale-95">
+            👥 PLAYERS
+          </button>
+          
+          <button onclick="toggleChatDrawer()" class="py-2.5 px-3 bg-[#0D1017]/90 backdrop-blur-md border border-white/50 text-white rounded-xl font-mono text-xs font-bold uppercase shadow-lg active:scale-95">
+            💬
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawers -->
+    <div id="drawer-chat" class="hidden absolute inset-x-3 bottom-20 max-h-64 bg-[#0B0E14]/95 backdrop-blur-md border border-gray-700 rounded-2xl z-40 flex flex-col font-mono shadow-2xl overflow-hidden">
+      <div class="px-3 py-2 border-b border-gray-800 flex justify-between items-center bg-black/40 text-xs">
+        <span class="font-bold text-[#CCFF00]">CAMPUS CHAT</span>
+        <button onclick="toggleChatDrawer()" class="text-gray-400 hover:text-white">✕</button>
+      </div>
+      <div id="chat-feed" class="flex-1 p-3 space-y-1.5 overflow-y-auto text-xs max-h-44 text-gray-300"></div>
+      <form onsubmit="handleSendChat(event)" class="border-t border-gray-800 p-2 flex gap-1.5 bg-black/50">
+        <input id="chat-text-input" type="text" placeholder="Type transmission..." maxlength="80" class="flex-1 bg-[#10141E] border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#CCFF00]">
+        <button type="submit" class="px-3 py-1.5 bg-[#CCFF00] text-black font-bold text-xs uppercase rounded-lg">SEND</button>
+      </form>
+    </div>
+
+    <div id="drawer-tasks" class="hidden absolute inset-x-3 bottom-20 bg-[#0B0E14]/95 backdrop-blur-md border border-[#00F5FF]/60 rounded-2xl z-40 p-3.5 font-mono shadow-2xl max-h-80 overflow-y-auto no-scrollbar">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
+        <span class="text-xs text-[#00F5FF] font-bold">HIDER OBJECTIVES</span>
+        <button onclick="toggleTasksDrawer()" class="text-xs text-gray-400 hover:text-white">✕</button>
+      </div>
+      <div id="tasks-feed" class="space-y-2"></div>
+    </div>
+
+    <div id="drawer-powers" class="hidden absolute inset-x-3 bottom-20 bg-[#0B0E14]/95 backdrop-blur-md border border-[#FFB800]/60 rounded-2xl z-40 p-3.5 font-mono shadow-2xl">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
+        <span class="text-xs text-[#FFB800] font-bold">TACTICAL PERKS</span>
+        <button onclick="togglePowersDrawer()" class="text-xs text-gray-400 hover:text-white">✕</button>
+      </div>
+      <div id="powers-feed" class="grid grid-cols-2 gap-2 text-xs"></div>
+    </div>
+
+    <div id="drawer-players" class="hidden absolute inset-x-3 bottom-20 bg-[#0B0E14]/95 backdrop-blur-md border border-gray-700 rounded-2xl z-40 p-3.5 font-mono shadow-2xl max-h-72 overflow-y-auto no-scrollbar">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
+        <span class="text-xs text-white font-bold">ACTIVE OPERATIVES</span>
+        <button onclick="togglePlayersDrawer()" class="text-xs text-gray-400 hover:text-white">✕</button>
+      </div>
+      <div id="players-roster-feed" class="space-y-1.5 text-xs"></div>
+    </div>
+  </section>
+
+  <!-- ==================== MODAL: SEEKER ELIMINATION CAMERA SNAPPER ==================== -->
+  <div id="modal-seeker-camera" class="hidden fixed inset-0 z-[260] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="w-full max-w-sm bg-[#0D1017] border-2 border-[#FF0055] rounded-2xl p-4 flex flex-col space-y-3 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+        <div>
+          <span class="text-xs text-[#FF0055] font-bold uppercase block">TARGET EVIDENCE CAPTURE</span>
+          <span id="seeker-camera-target-name" class="text-[11px] text-white">TARGET: AGENT_SHADOW</span>
+        </div>
+        <button onclick="closeSeekerPhotoModal()" class="text-gray-400 hover:text-white text-xs">✕</button>
+      </div>
+      
+      <div class="border-2 border-dashed border-gray-700 rounded-xl p-3 text-center bg-black flex flex-col items-center justify-center min-h-[160px]">
+        <img id="seeker-evidence-preview" class="hidden max-h-40 object-contain rounded mb-2 border border-[#FF0055]/50">
+        <label class="cursor-pointer py-2.5 px-4 bg-[#FF0055] text-white font-bold text-xs uppercase rounded-xl hover:bg-white hover:text-black transition-all shadow-md">
+          📸 SNAP BODY / FACE PHOTO
+          <input type="file" accept="image/*" capture="environment" onchange="handleSeekerPhotoUpload(event)" class="hidden">
+        </label>
+        <span class="text-[9px] text-gray-400 mt-2">Take clear photo of runner's body or face to verify elimination</span>
+      </div>
+
+      <button id="btn-confirm-elimination" onclick="confirmOfficialPhotoElimination()" disabled class="w-full py-3 bg-gray-800 text-gray-500 font-bold text-xs uppercase rounded-xl cursor-not-allowed transition-all">
+        CONFIRM OFFICIAL ELIMINATION ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CAUGHT HIDER ELIMINATION POPUP ==================== -->
+  <div id="modal-eliminated-popup" class="hidden fixed inset-0 z-[300] bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 font-mono">
+    <div class="w-full max-w-sm bg-[#12050A] border-2 border-[#FF0055] rounded-2xl p-5 flex flex-col space-y-4 shadow-[0_0_50px_#FF0055] text-center">
+      <div class="space-y-1">
+        <span class="text-3xl animate-bounce block">🚨</span>
+        <h2 class="font-outfit text-2xl font-black text-[#FF0055] glow-pink">YOU ARE ELIMINATED!</h2>
+        <p id="eliminated-reason-label" class="text-xs text-gray-300">Tagged by Seeker</p>
+      </div>
+
+      <div id="eliminated-photo-container" class="hidden border border-gray-800 rounded-xl p-2 bg-black">
+        <span class="text-[9px] text-gray-400 block mb-1">EVIDENCE SNAPSHOT SUBMITTED:</span>
+        <img id="eliminated-photo-proof" class="w-full h-36 object-contain rounded border border-gray-700">
+      </div>
+
+      <div class="space-y-2">
+        <button onclick="enterSpectatorMode()" class="w-full py-3 bg-[#00F5FF] text-black font-outfit font-black text-xs uppercase rounded-xl hover:bg-white transition-all shadow-md">
+          👁️ SPECTATE MATCH
+        </button>
+        <button id="btn-spectator-angel" onclick="enterGuardianSpectator()" class="w-full py-2.5 bg-[#FFD700] text-black font-outfit font-black text-xs uppercase rounded-xl hover:bg-white transition-all shadow-md">
+          👼 ACT AS GUARDIAN ANGEL (PROTECT 1 PERSON)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: TASK PHOTO CAPTURE (HIDERS) ==================== -->
+  <div id="modal-camera" class="hidden fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 font-mono">
+    <div class="w-full max-w-sm bg-[#0D1017] border border-[#00F5FF] rounded-2xl p-4 flex flex-col space-y-3 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+        <span id="modal-task-heading" class="text-xs text-[#00F5FF] font-bold uppercase">SNAP CAMPUS PROOF</span>
+        <button onclick="closeCameraModal()" class="text-gray-400 hover:text-white text-xs">✕</button>
+      </div>
+      
+      <div class="border border-dashed border-gray-700 rounded-xl p-4 text-center bg-black flex flex-col items-center justify-center min-h-[140px]">
+        <img id="photo-preview-element" class="hidden max-h-36 object-contain rounded mb-2 border border-white/20">
+        <label class="cursor-pointer py-2 px-3 bg-[#00F5FF] text-black font-bold text-xs uppercase rounded-lg hover:bg-white transition-all">
+          📷 TAKE PHOTO / UPLOAD
+          <input type="file" accept="image/*" capture="environment" onchange="handleTaskPhotoUpload(event)" class="hidden">
+        </label>
+        <span class="text-[9px] text-gray-500 mt-2">Take live snapshot on campus to verify task</span>
+      </div>
+
+      <button id="btn-submit-task" onclick="confirmTaskCompletion()" disabled class="w-full py-2.5 bg-gray-700 text-gray-400 font-bold text-xs uppercase rounded-xl cursor-not-allowed">
+        SUBMIT VERIFIED EVIDENCE
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: POST MATCH DEBRIEF WITH VOTER LIST & REMATCH ==================== -->
+  <div id="modal-debrief" class="hidden fixed inset-0 z-[300] bg-black/95 backdrop-blur-lg flex items-center justify-center p-4 font-mono">
+    <div class="w-full max-w-md bg-[#0D1017] border-2 border-[#CCFF00] rounded-2xl p-5 flex flex-col space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+      <div class="text-center border-b border-gray-800 pb-3">
+        <span class="text-[10px] text-[#00F5FF] tracking-widest uppercase">TACTICAL DEBRIEF // GAME OVER</span>
+        <h2 id="debrief-winner" class="font-outfit text-3xl font-black text-[#CCFF00] glow-lime mt-1">HIDERS WIN</h2>
+        <p id="debrief-reason" class="text-xs text-gray-400 mt-1">Extraction quota completed!</p>
+      </div>
+
+      <!-- Seeker Hunt Leaderboard -->
+      <div class="bg-black/60 p-3.5 rounded-xl border border-gray-800 space-y-2">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-1">
+          <span class="text-xs text-[#FFB800] font-bold">SEEKER HUNTS // ELIMINATION TALLY</span>
+          <span class="text-[10px] text-gray-400">TOTAL FINDINGS</span>
+        </div>
+        <div id="debrief-standings" class="space-y-1.5 text-xs"></div>
+      </div>
+
+      <!-- Elimination Photos Gallery -->
+      <div class="bg-black/60 p-3.5 rounded-xl border border-[#FF0055]/40 space-y-2">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-1">
+          <span class="text-xs text-[#FF0055] font-bold">CAUGHT HIDERS PHOTO PROOF</span>
+          <span id="debrief-elim-count" class="text-[10px] text-gray-400">0 CAUGHT</span>
+        </div>
+        <div id="debrief-elim-gallery" class="grid grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto no-scrollbar"></div>
+      </div>
+
+      <!-- Task Photos Gallery -->
+      <div class="bg-black/60 p-3.5 rounded-xl border border-gray-800 space-y-2">
+        <div class="flex justify-between items-center border-b border-gray-800 pb-1">
+          <span class="text-xs text-[#00F5FF] font-bold">VERIFIED TASK LANDMARKS</span>
+          <span id="debrief-photo-count" class="text-[10px] text-gray-400">0 PHOTOS</span>
+        </div>
+        <div id="debrief-photos-gallery" class="grid grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto no-scrollbar"></div>
+      </div>
+
+      <!-- REMATCH LIVE VOTING LIST (Shows who wants to play) -->
+      <div class="bg-[#121622] p-3 rounded-xl border border-gray-800 space-y-2">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-[#00F5FF] font-bold">REMATCH SQUAD ROSTER:</span>
+          <span id="rematch-vote-counter" class="text-[#CCFF00] font-bold">0 VOTED</span>
+        </div>
+        <div id="rematch-voters-list" class="flex flex-wrap gap-1 text-[10px] text-gray-300">
+          <span class="text-gray-500 italic">No players voted yet.</span>
+        </div>
+      </div>
+
+      <!-- Rematch & New Game Controls -->
+      <div class="space-y-2 pt-2 border-t border-gray-800">
+        <button onclick="voteRematch()" id="btn-vote-rematch" class="w-full py-3 bg-[#CCFF00] hover:bg-white text-black font-outfit font-black text-xs uppercase rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5">
+          <span>✋</span>
+          <span>I WANT TO PLAY (VOTE REMATCH)</span>
+        </button>
+        <button id="btn-host-trigger-rematch" onclick="triggerHostRematch()" class="hidden w-full py-2.5 bg-[#00F5FF] text-black font-outfit font-bold text-xs uppercase rounded-xl hover:bg-white transition-all">
+          🔄 HOST: RETURN ALL PLAYERS TO LOBBY
+        </button>
+        <button onclick="location.reload()" class="w-full py-2 bg-[#121622] hover:bg-gray-800 border border-gray-700 text-gray-300 font-outfit font-bold text-xs uppercase rounded-xl transition-all">
+          🆕 NEW GAME (CREATE FRESH ROOM)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    const socket = io();
+
+    const STATE = {
+      role: 'hider',
+      callsign: 'GHOST_VIPUL',
+      roomCode: '',
+      isHost: false,
+      isSpectating: false,
+      isProtector: false,
+      guardianUsesLeft: 1,
+      targetInScope: null,
+      myCatches: 0,
+      matchSettings: {},
+      zoneCenter: null,
+      zoneBoundaryCircle: null,
+      userLocation: { lat: 20.5937, lng: 78.9629 }, // Initial world fallback
+      map: null,
+      currentTileLayer: null,
+      currentMapStyle: 'dark',
+      markers: {},
+      myAccuracyCircle: null,
+      mediaRecorder: null,
+      activeTaskId: null,
+      seekerProofPhotoData: null,
+      taskPhotoData: null,
+      myTasks: [
+        { id: 't1', title: 'Main Quad Clock', desc: 'Photograph clock tower face', completed: false },
+        { id: 't2', title: 'Library Reception', desc: 'Snap photo of entry desk', completed: false }
+      ],
+      seekerQuota: 2,
+      hiderQuota: 18,
+      connectedPlayers: []
+    };
+
+    const TILE_SOURCES = {
+      dark: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', className: 'tile-dark' },
+      sat: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{x}/{y}', className: '' },
+      streets: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', className: '' },
+      matrix: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', className: 'tile-matrix' }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Auto-detect room code from URL query (?room=CAMPUS-XXXX)
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room');
+      if (roomParam) {
+        document.getElementById('join-room-code').value = roomParam;
+        handleEnterWorld();
+        openJoinModal();
+      }
+    });
+
+    function handleEnterWorld() {
+      document.getElementById('intro-step-1').classList.add('hidden');
+      document.getElementById('intro-step-2').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('sub-find-hunt').classList.remove('opacity-0');
+        document.getElementById('rule-btn-container').classList.remove('opacity-0');
+        document.getElementById('btn-portal-group').classList.remove('opacity-0');
+      }, 600);
+    }
+
+    function openRuleBookModal() { document.getElementById('modal-rulebook').classList.remove('hidden'); }
+    function closeRuleBookModal() { document.getElementById('modal-rulebook').classList.add('hidden'); }
+    function openHostModal() { document.getElementById('modal-host').classList.remove('hidden'); }
+    function closeHostModal() { document.getElementById('modal-host').classList.add('hidden'); }
+    function openJoinModal() { document.getElementById('modal-join').classList.remove('hidden'); }
+    function closeJoinModal() { document.getElementById('modal-join').classList.add('hidden'); }
+
+    function setRole(r) {
+      STATE.role = r;
+      const hBtn = document.getElementById('role-pick-hider');
+      const sBtn = document.getElementById('role-pick-seeker');
+      if (r === 'hider') {
+        hBtn.className = "py-2.5 rounded-lg border-2 border-[#CCFF00] bg-[#CCFF00]/10 text-[#CCFF00] font-bold uppercase flex items-center justify-center gap-1.5";
+        sBtn.className = "py-2.5 rounded-lg border border-gray-700 bg-black text-gray-400 font-bold uppercase flex items-center justify-center gap-1.5";
+      } else {
+        sBtn.className = "py-2.5 rounded-lg border-2 border-[#FF0055] bg-[#FF0055]/10 text-[#FF0055] font-bold uppercase flex items-center justify-center gap-1.5";
+        hBtn.className = "py-2.5 rounded-lg border border-gray-700 bg-black text-gray-400 font-bold uppercase flex items-center justify-center gap-1.5";
+      }
+    }
+
+    // Interactive Stepper for Seekers & Hiders (20 Total)
+    function adjustSeekers(delta) {
+      let nextSeekers = STATE.seekerQuota + delta;
+      if (nextSeekers < 1) nextSeekers = 1;
+      if (nextSeekers > 5) nextSeekers = 5;
+      
+      STATE.seekerQuota = nextSeekers;
+      STATE.hiderQuota = 20 - nextSeekers;
+
+      document.getElementById('stepper-seeker-count').innerText = STATE.seekerQuota;
+      document.getElementById('stepper-hider-count').innerText = STATE.hiderQuota;
+      document.getElementById('lbl-roster-seekers').innerText = STATE.seekerQuota;
+      document.getElementById('lbl-roster-hiders').innerText = STATE.hiderQuota;
+      document.getElementById('auto-seeker-lbl').innerText = STATE.seekerQuota;
+      document.getElementById('auto-hider-lbl').innerText = STATE.hiderQuota;
+    }
+
+    function detectHostGPS() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          STATE.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          alert(`GPS Locked: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+        }, err => alert('Please permit browser location access.'));
+      }
+    }
+
+    function createRoomOnServer() {
+      STATE.callsign = document.getElementById('host-callsign').value || 'HOST_VIPUL';
+      STATE.isHost = true;
+
+      const settings = {
+        catchMethod: document.getElementById('cfg-catch-method').value,
+        catchRadius: parseInt(document.getElementById('cfg-catch-radius').value || 10),
+        selfReport: document.getElementById('cfg-self-report').checked,
+        gpsFilter: parseInt(document.getElementById('cfg-gps-filter').value || 75),
+        maxSpeed: parseInt(document.getElementById('cfg-max-speed').value || 0),
+        practiceMode: document.getElementById('cfg-practice-mode').checked,
+        huntersSeen: document.getElementById('cfg-hunters-seen').value,
+        runnersSeen: document.getElementById('cfg-runners-seen').value,
+        pingInterval: parseInt(document.getElementById('cfg-ping-interval').value || 180),
+        teammatesSee: document.getElementById('cfg-teammates-see').checked,
+        spectatorsSee: document.getElementById('cfg-spectators-see').checked,
+        zoneRadius: parseInt(document.getElementById('cfg-zone-radius').value || 500),
+        shrinkingZone: document.getElementById('cfg-shrinking-zone').checked,
+        leavingZonePenalty: document.getElementById('cfg-leaving-zone').value,
+        gracePeriodSec: parseInt(document.getElementById('cfg-grace-period').value || 10),
+        autoAssignRoles: true,
+        seekerQuota: STATE.seekerQuota,
+        hiderQuota: STATE.hiderQuota,
+        enableGuardian: document.getElementById('toggle-guardian-role').checked,
+        enableInfected: document.getElementById('toggle-infected-mode').checked,
+        taskCount: 2,
+        seekerPowers: {
+          uav: document.getElementById('toggle-pow-uav').checked,
+          sonar: document.getElementById('toggle-pow-sonar').checked,
+          overdrive: document.getElementById('toggle-pow-overdrive').checked,
+          emp: document.getElementById('toggle-pow-emp').checked
+        },
+        hiderPowers: {
+          cloak: document.getElementById('toggle-pow-cloak').checked,
+          decoy: document.getElementById('toggle-pow-decoy').checked,
+          sixthSense: document.getElementById('toggle-pow-sense').checked,
+          smoke: document.getElementById('toggle-pow-smoke').checked
+        }
+      };
+
+      socket.emit('create_room', {
+        callsign: STATE.callsign,
+        role: STATE.role,
+        lat: STATE.userLocation.lat,
+        lng: STATE.userLocation.lng,
+        settings: settings
+      });
+    }
+
+    socket.on('room_created', ({ roomCode, player, settings }) => {
+      STATE.roomCode = roomCode;
+      STATE.role = player.role;
+      STATE.matchSettings = settings;
+      closeHostModal();
+      document.getElementById('invite-room-code').innerText = roomCode;
+      document.getElementById('invite-link-input').value = `${window.location.origin}/?room=${roomCode}`;
+      document.getElementById('modal-invite').classList.remove('hidden');
+    });
+
+    function submitJoinServer() {
+      const code = document.getElementById('join-room-code').value.trim().toUpperCase();
+      STATE.callsign = document.getElementById('join-callsign').value.trim() || 'AGENT';
+
+      socket.emit('join_room', {
+        roomCode: code,
+        callsign: STATE.callsign,
+        preferredRole: 'hider'
+      });
+    }
+
+    socket.on('joined_successfully', ({ roomCode, player, settings }) => {
+      STATE.roomCode = roomCode;
+      STATE.role = player.role;
+      STATE.matchSettings = settings;
+      closeJoinModal();
+      document.getElementById('invite-room-code').innerText = roomCode;
+      document.getElementById('invite-link-input').value = `${window.location.origin}/?room=${roomCode}`;
+      document.getElementById('btn-start-match').classList.add('hidden');
+      document.getElementById('modal-invite').classList.remove('hidden');
+    });
+
+    socket.on('error_msg', (msg) => { alert(msg); });
+
+    // Lobby Update & Minimum 5 Players Enforcement
+    socket.on('lobby_update', (players) => {
+      STATE.connectedPlayers = players;
+      const count = players.length;
+      document.getElementById('lobby-player-count').innerText = `${count} / 20`;
+
+      const startBtn = document.getElementById('btn-start-match');
+      const readyTag = document.getElementById('lobby-readiness-tag');
+
+      if (count < 5) {
+        startBtn.disabled = true;
+        startBtn.innerText = `WAITING FOR 5 PLAYERS (${count}/5)`;
+        startBtn.className = "w-full py-3.5 bg-gray-700 text-gray-400 font-outfit font-black text-sm uppercase rounded-xl shadow-md cursor-not-allowed";
+        readyTag.innerText = `WAITING (${count}/5 REQUIRED)`;
+        readyTag.className = "text-yellow-400 font-bold";
+      } else {
+        startBtn.disabled = false;
+        startBtn.innerText = `START MATCH SESSION (${count} PLAYERS READY) ➔`;
+        startBtn.className = "w-full py-3.5 bg-[#FF0055] hover:bg-white hover:text-black text-white font-outfit font-black text-sm uppercase rounded-xl transition-all shadow-[0_0_25px_rgba(255,0,85,0.4)] active:scale-95";
+        readyTag.innerText = "MISSION READY";
+        readyTag.className = "text-[#CCFF00] font-bold";
+      }
+
+      const avatarsDiv = document.getElementById('lobby-avatars');
+      avatarsDiv.innerHTML = '';
+      players.forEach(p => {
+        const badge = document.createElement('span');
+        badge.className = `text-[10px] font-mono px-2 py-0.5 rounded border ${p.role === 'hider' ? 'border-[#CCFF00] text-[#CCFF00]' : 'border-[#FF0055] text-[#FF0055]'}`;
+        badge.innerText = `${p.callsign} (${p.role.toUpperCase()})`;
+        avatarsDiv.appendChild(badge);
+      });
+      renderPlayersRoster();
+    });
+
+    function copyInviteLink() {
+      const el = document.getElementById('invite-link-input');
+      el.select();
+      navigator.clipboard.writeText(el.value);
+      document.getElementById('btn-copy-link').innerText = "COPIED!";
+      setTimeout(() => { document.getElementById('btn-copy-link').innerText = "COPY"; }, 1500);
+    }
+
+    function shareViaWhatsApp() {
+      const link = document.getElementById('invite-link-input').value;
+      const text = encodeURIComponent(`🚨 Join my MAN-HUNT tactical room! Code: ${STATE.roomCode}. Tap here: ${link}`);
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
+
+    function requestStartGame() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          socket.emit('start_game', { hostLat: pos.coords.latitude, hostLng: pos.coords.longitude });
+        }, () => {
+          socket.emit('start_game', { hostLat: STATE.userLocation.lat, hostLng: STATE.userLocation.lng });
+        });
+      } else {
+        socket.emit('start_game', { hostLat: STATE.userLocation.lat, hostLng: STATE.userLocation.lng });
+      }
+    }
+
+    socket.on('game_started', ({ settings, center, players }) => {
+      STATE.matchSettings = settings;
+      STATE.zoneCenter = center;
+
+      document.getElementById('modal-invite').classList.add('hidden');
+      document.getElementById('screen-intro').classList.add('hidden');
+      document.getElementById('modal-debrief').classList.add('hidden');
+      document.getElementById('modal-eliminated-popup').classList.add('hidden');
+      document.getElementById('zone-warning-banner').classList.add('hidden');
+      document.getElementById('pause-overlay-banner').classList.add('hidden');
+      document.getElementById('screen-game').classList.remove('hidden');
+
+      const me = (players || []).find(p => p.id === socket.id);
+      if (me) {
+        STATE.isProtector = me.isProtector;
+        STATE.role = me.role;
+      }
+
+      updateRoleUI();
+
+      // Initialize map: zooms into local detected origin on game launch
+      initMapEngine(center);
+      drawPlayZoneBoundary();
+      startLiveGPS();
+      renderTasksList();
+      renderPowers();
+
+      if (STATE.isProtector) {
+        document.getElementById('guardian-action-dock').classList.remove('hidden');
+      }
+
+      if (STATE.isHost) {
+        document.getElementById('btn-host-pause').classList.remove('hidden');
+      }
+    });
+
+    function updateRoleUI() {
+      const rolePill = document.getElementById('hud-role-pill');
+      const channelTag = document.getElementById('hud-channel-tag');
+      const tasksBtn = document.getElementById('dock-btn-tasks');
+
+      if (STATE.role === 'hider') {
+        rolePill.innerText = STATE.isProtector ? "GUARDIAN HIDER" : "HIDER";
+        rolePill.className = "text-[11px] px-2.5 py-1 bg-[#CCFF00] text-black font-outfit font-black rounded";
+        channelTag.innerText = "FREQ: HIDER SQUAD";
+        channelTag.className = "text-[#CCFF00]";
+        tasksBtn.classList.remove('hidden');
+      } else {
+        rolePill.innerText = "SEEKER";
+        rolePill.className = "text-[11px] px-2.5 py-1 bg-[#FF0055] text-white font-outfit font-black rounded";
+        channelTag.innerText = "FREQ: SEEKER SCANNER";
+        channelTag.className = "text-[#FF0055]";
+        tasksBtn.classList.add('hidden');
+      }
+    }
+
+    // In-Game Host Pause / Resume
+    function togglePauseGame() {
+      socket.emit('toggle_pause_game');
+    }
+
+    socket.on('game_pause_state', ({ paused }) => {
+      const banner = document.getElementById('pause-overlay-banner');
+      const pauseBtn = document.getElementById('btn-host-pause');
+      if (paused) {
+        banner.classList.remove('hidden');
+        if (pauseBtn) pauseBtn.innerText = "▶️ RESUME";
+      } else {
+        banner.classList.add('hidden');
+        if (pauseBtn) pauseBtn.innerText = "⏸️ PAUSE";
+      }
+    });
+
+    // Map Engine: Starts broad, locks onto host/user coordinates when started
+    function initMapEngine(centerCoords = null) {
+      if (STATE.map) return;
+      const initialView = centerCoords ? [centerCoords.lat, centerCoords.lng] : [20.5937, 78.9629];
+      const initialZoom = centerCoords ? 17 : 4; // World overview initially, tactical close-up on start
+
+      STATE.map = L.map('leaflet-map', { zoomControl: false, attributionControl: false })
+        .setView(initialView, initialZoom);
+      applyTileLayer(STATE.currentMapStyle);
+
+      // Tap-to-move for Practice Mode indoors
+      STATE.map.on('click', (e) => {
+        if (STATE.matchSettings.practiceMode) {
+          STATE.userLocation = { lat: e.latlng.lat, lng: e.latlng.lng };
+          updateSelfMarker(10);
+          socket.emit('send_gps', STATE.userLocation);
+        }
+      });
+    }
+
+    function applyTileLayer(styleKey) {
+      if (!STATE.map) return;
+      if (STATE.currentTileLayer) STATE.map.removeLayer(STATE.currentTileLayer);
+      const conf = TILE_SOURCES[styleKey];
+      STATE.currentTileLayer = L.tileLayer(conf.url, { maxZoom: 19, className: conf.className }).addTo(STATE.map);
+      STATE.currentMapStyle = styleKey;
+    }
+
+    function changeMapStyle(k) { applyTileLayer(k); }
+
+    function drawPlayZoneBoundary() {
+      if (!STATE.map || !STATE.zoneCenter) return;
+      if (STATE.zoneBoundaryCircle) STATE.map.removeLayer(STATE.zoneBoundaryCircle);
+
+      const radius = STATE.matchSettings.zoneRadius || 500;
+      STATE.zoneBoundaryCircle = L.circle([STATE.zoneCenter.lat, STATE.zoneCenter.lng], {
+        radius: radius,
+        color: '#00F5FF',
+        dashArray: '8, 8',
+        weight: 2,
+        fillColor: '#00F5FF',
+        fillOpacity: 0.03
+      }).addTo(STATE.map);
+    }
+
+    function startLiveGPS() {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.watchPosition((pos) => {
+          STATE.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          updateSelfMarker(pos.coords.accuracy);
+          socket.emit('send_gps', STATE.userLocation);
+        }, () => {}, { enableHighAccuracy: true });
+      }
+    }
+
+    function updateSelfMarker(acc = 15) {
+      if (!STATE.map) return;
+      const myColor = (STATE.role === 'hider') ? '#CCFF00' : '#FF0055';
+      if (STATE.markers['self']) {
+        STATE.markers['self'].setLatLng([STATE.userLocation.lat, STATE.userLocation.lng]);
+        if (STATE.myAccuracyCircle) STATE.myAccuracyCircle.setLatLng([STATE.userLocation.lat, STATE.userLocation.lng]);
+      } else {
+        STATE.markers['self'] = L.marker([STATE.userLocation.lat, STATE.userLocation.lng], {
+          icon: L.divIcon({
+            className: 'custom-blip',
+            html: `<div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%,-50%);">
+              <div style="width:14px; height:14px; border-radius:50%; background:${myColor}; border:2px solid white; box-shadow:0 0 10px ${myColor};"></div>
+              <span style="font-size:9px; background:rgba(0,0,0,0.85); color:${myColor}; padding:1px 4px; border-radius:2px; font-family:monospace; margin-top:2px;">YOU (${STATE.callsign})</span>
+            </div>`,
+            iconSize: [0, 0]
+          })
+        }).addTo(STATE.map);
+
+        STATE.myAccuracyCircle = L.circle([STATE.userLocation.lat, STATE.userLocation.lng], {
+          radius: acc,
+          color: myColor,
+          weight: 1,
+          opacity: 0.3,
+          fillColor: myColor,
+          fillOpacity: 0.08
+        }).addTo(STATE.map);
+      }
+    }
+
+    function recenterGPS() {
+      if (STATE.map) STATE.map.setView([STATE.userLocation.lat, STATE.userLocation.lng], 17);
+    }
+
+    // Seeker Lock on Target
+    socket.on('target_scope_update', (target) => {
+      STATE.targetInScope = target;
+      const banner = document.getElementById('seeker-target-banner');
+      const targetNameEl = document.getElementById('seeker-target-name');
+      const immuneBadge = document.getElementById('seeker-target-immune-badge');
+      const actionBtn = document.getElementById('btn-seeker-action');
+
+      if (target && STATE.role === 'seeker') {
+        banner.classList.remove('hidden');
+        targetNameEl.innerText = `YOU FOUND: ${target.name} (~${target.distance}m away!)`;
+
+        const isDirect = (STATE.matchSettings.catchMethod === 'direct');
+        actionBtn.innerText = isDirect ? `⚡ DIRECT ELIMINATE ${target.name}` : `📷 SNAP PHOTO EVIDENCE`;
+
+        if (target.isImmune) {
+          immuneBadge.classList.remove('hidden');
+          immuneBadge.innerText = `⚠️ SHIELDED BY GUARDIAN ANGEL (IMMUNE FOR ${target.immuneRemaining}s)!`;
+          actionBtn.disabled = true;
+          actionBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+          immuneBadge.classList.add('hidden');
+          actionBtn.disabled = false;
+          actionBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+      } else {
+        banner.classList.add('hidden');
+      }
+    });
+
+    function handleSeekerAction() {
+      if (!STATE.targetInScope || STATE.targetInScope.isImmune) return;
+
+      const isDirect = (STATE.matchSettings.catchMethod === 'direct');
+      if (isDirect) {
+        socket.emit('direct_eliminate_target', { targetHiderId: STATE.targetInScope.id });
+      } else {
+        openSeekerPhotoModal();
+      }
+    }
+
+    // Mandatory Out-of-Zone Countdown Warning
+    socket.on('zone_warning', ({ isOutOfBounds, secondsRemaining }) => {
+      const banner = document.getElementById('zone-warning-banner');
+      if (isOutOfBounds) {
+        banner.classList.remove('hidden');
+        document.getElementById('zone-countdown-sec').innerText = `${secondsRemaining}`;
+      } else {
+        banner.classList.add('hidden');
+      }
+    });
+
+    // Seeker Photo Capture
+    function openSeekerPhotoModal() {
+      document.getElementById('seeker-camera-target-name').innerText = `TARGET: ${STATE.targetInScope.name}`;
+      document.getElementById('seeker-evidence-preview').classList.add('hidden');
+      document.getElementById('btn-confirm-elimination').disabled = true;
+      document.getElementById('modal-seeker-camera').classList.remove('hidden');
+    }
+
+    function closeSeekerPhotoModal() {
+      document.getElementById('modal-seeker-camera').classList.add('hidden');
+    }
+
+    function handleSeekerPhotoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        STATE.seekerProofPhotoData = evt.target.result;
+        const img = document.getElementById('seeker-evidence-preview');
+        img.src = evt.target.result;
+        img.classList.remove('hidden');
+
+        const btn = document.getElementById('btn-confirm-elimination');
+        btn.disabled = false;
+        btn.className = "w-full py-3 bg-[#CCFF00] hover:bg-white text-black font-outfit font-black text-xs uppercase rounded-xl shadow-lg transition-all";
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function confirmOfficialPhotoElimination() {
+      if (!STATE.targetInScope || !STATE.seekerProofPhotoData) return;
+      socket.emit('confirm_photo_elimination', {
+        targetHiderId: STATE.targetInScope.id,
+        photoData: STATE.seekerProofPhotoData
+      });
+      closeSeekerPhotoModal();
+    }
+
+    socket.on('player_officially_eliminated', ({ seekerName, targetName, totalCatches, reason }) => {
+      if (seekerName === STATE.callsign) {
+        STATE.myCatches = totalCatches;
+        document.getElementById('hud-elim-counter').innerText = `${totalCatches} CATCHES`;
+      }
+      alert(`🎯 OFFICIAL ELIMINATION! ${targetName} eliminated! (${reason})`);
+    });
+
+    socket.on('you_are_eliminated', ({ reason, photoData, canBeProtector }) => {
+      document.getElementById('eliminated-reason-label').innerText = `${reason}`;
+      const photoBox = document.getElementById('eliminated-photo-container');
+      if (photoData) {
+        photoBox.classList.remove('hidden');
+        document.getElementById('eliminated-photo-proof').src = photoData;
+      } else {
+        photoBox.classList.add('hidden');
+      }
+
+      const angelBtn = document.getElementById('btn-spectator-angel');
+      if (canBeProtector && STATE.guardianUsesLeft > 0) {
+        angelBtn.classList.remove('hidden');
+      } else {
+        angelBtn.classList.add('hidden');
+      }
+
+      document.getElementById('modal-eliminated-popup').classList.remove('hidden');
+    });
+
+    function enterSpectatorMode() {
+      STATE.isSpectating = true;
+      document.getElementById('modal-eliminated-popup').classList.add('hidden');
+      document.getElementById('hud-role-pill').innerText = "SPECTATOR";
+      document.getElementById('hud-role-pill').className = "text-[11px] px-2.5 py-1 bg-gray-600 text-white font-outfit font-black rounded";
+    }
+
+    function enterGuardianSpectator() {
+      enterSpectatorMode();
+      document.getElementById('guardian-action-dock').classList.remove('hidden');
+    }
+
+    function triggerGuardianShield() {
+      if (STATE.guardianUsesLeft <= 0) return alert("Guardian Shield already used!");
+      const hiderTeammate = STATE.connectedPlayers.find(p => p.role === 'hider' && p.id !== socket.id && !p.isCaught);
+      if (!hiderTeammate) return alert("No active teammates to shield!");
+
+      STATE.guardianUsesLeft--;
+      document.getElementById('btn-angel-shield').disabled = true;
+      document.getElementById('btn-angel-shield').classList.add('opacity-50');
+
+      socket.emit('activate_guardian_shield', { targetHiderId: hiderTeammate.id });
+    }
+
+    socket.on('guardian_shield_activated', ({ guardianName, targetName, targetId, duration }) => {
+      alert(`👼 GUARDIAN REVIVE! ${guardianName} shielded ${targetName}! Immune for ${duration}s!`);
+      if (targetId === socket.id) {
+        const banner = document.getElementById('hider-shield-banner');
+        banner.classList.remove('hidden');
+        document.body.classList.add('shield-alert');
+        let left = duration;
+        const interval = setInterval(() => {
+          left--;
+          document.getElementById('shield-timer-label').innerText = `${left}s`;
+          if (left <= 0) {
+            clearInterval(interval);
+            banner.classList.add('hidden');
+            document.body.classList.remove('shield-alert');
+          }
+        }, 1000);
+      }
+    });
+
+    socket.on('radar_sync', (visiblePlayers) => {
+      if (!STATE.map) return;
+      visiblePlayers.forEach(p => {
+        if (p.id === socket.id) return;
+        let color = (p.role === 'hider') ? '#CCFF00' : '#FF0055';
+        if (p.isImmune) color = '#FFD700';
+
+        if (STATE.markers[p.id]) {
+          STATE.markers[p.id].setLatLng([p.lat, p.lng]);
+        } else {
+          STATE.markers[p.id] = L.marker([p.lat, p.lng], {
+            icon: L.divIcon({
+              className: 'radar-pin',
+              html: `<div style="display:flex; flex-direction:column; align-items:center; transform:translate(-50%,-50%);">
+                <div style="width:12px; height:12px; border-radius:50%; background:${color}; border:2px solid white; box-shadow:0 0 8px ${color};"></div>
+                <span style="font-size:9px; background:rgba(0,0,0,0.85); color:${color}; padding:1px 3px; border-radius:2px; font-family:monospace; margin-top:2px;">${p.name}${p.isImmune ? ' 🛡️' : ''}</span>
+              </div>`,
+              iconSize: [0, 0]
+            })
+          }).addTo(STATE.map);
+        }
+      });
+    });
+
+    socket.on('proximity_alert', ({ distance }) => {
+      const banner = document.getElementById('proximity-banner');
+      document.getElementById('proximity-distance-label').innerText = `SEEKER IS ~${distance}m AWAY! RUN!`;
+      banner.classList.remove('hidden');
+      document.body.classList.add('proximity-alert');
+      setTimeout(() => {
+        banner.classList.add('hidden');
+        document.body.classList.remove('proximity-alert');
+      }, 3000);
+    });
+
+    // Match End Debrief
+    socket.on('game_over', ({ winner, reason, standings, photos, eliminations }) => {
+      document.getElementById('debrief-winner').innerText = `${winner} VICTORY`;
+      document.getElementById('debrief-reason').innerText = reason;
+      
+      const stdDiv = document.getElementById('debrief-standings');
+      stdDiv.innerHTML = '';
+      const seekers = (standings || []).filter(s => s.role === 'seeker');
+      seekers.forEach(s => {
+        const row = document.createElement('div');
+        row.className = "flex justify-between items-center p-2 rounded bg-black/70 border border-gray-800";
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-sm">👁️</span>
+            <span class="font-bold text-white">${s.callsign}</span>
+          </div>
+          <span class="font-mono font-black text-sm text-[#CCFF00] bg-[#CCFF00]/10 px-2 py-0.5 rounded border border-[#CCFF00]/40">${s.catches || 0} HIDERS ELIMINATED</span>
+        `;
+        stdDiv.appendChild(row);
+      });
+
+      const elimGallery = document.getElementById('debrief-elim-gallery');
+      elimGallery.innerHTML = '';
+      const elimList = eliminations || [];
+      document.getElementById('debrief-elim-count').innerText = `${elimList.length} CAUGHT`;
+      elimList.forEach(el => {
+        const card = document.createElement('div');
+        card.className = "bg-black p-1.5 rounded-lg border border-[#FF0055]/50 flex flex-col space-y-1";
+        card.innerHTML = `
+          <img src="${el.photoData}" class="w-full h-24 object-cover rounded border border-gray-700">
+          <div class="text-[10px] text-[#FF0055] font-bold truncate">CAUGHT: ${el.target}</div>
+          <div class="text-[9px] text-gray-400 flex justify-between">
+            <span>By: ${el.seeker}</span>
+            <span>${el.time}</span>
+          </div>
+        `;
+        elimGallery.appendChild(card);
+      });
+
+      const taskGallery = document.getElementById('debrief-photos-gallery');
+      taskGallery.innerHTML = '';
+      const taskList = photos || [];
+      document.getElementById('debrief-photo-count').innerText = `${taskList.length} PHOTOS`;
+      taskList.forEach(ph => {
+        const card = document.createElement('div');
+        card.className = "bg-black p-1.5 rounded-lg border border-gray-800 flex flex-col space-y-1";
+        card.innerHTML = `
+          <img src="${ph.photoData}" class="w-full h-24 object-cover rounded border border-gray-700">
+          <div class="text-[10px] text-[#00F5FF] font-bold truncate">${ph.taskTitle}</div>
+          <div class="text-[9px] text-gray-400 flex justify-between">
+            <span>By: ${ph.uploader}</span>
+            <span>${ph.time}</span>
+          </div>
+        `;
+        taskGallery.appendChild(card);
+      });
+
+      if (STATE.isHost) {
+        document.getElementById('btn-host-trigger-rematch').classList.remove('hidden');
+      }
+
+      document.getElementById('modal-debrief').classList.remove('hidden');
+    });
+
+    // Rematch Roster & Voting Mechanism
+    function voteRematch() {
+      socket.emit('vote_rematch');
+      const btn = document.getElementById('btn-vote-rematch');
+      btn.innerText = "✓ VOTED READY FOR REMATCH";
+      btn.className = "w-full py-3 bg-green-500 text-black font-outfit font-black text-xs uppercase rounded-xl";
+    }
+
+    socket.on('rematch_roster_update', ({ votedList, totalVoted, totalNeeded }) => {
+      document.getElementById('rematch-vote-counter').innerText = `${totalVoted} / ${totalNeeded} READY`;
+      const listDiv = document.getElementById('rematch-voters-list');
+      listDiv.innerHTML = '';
+      votedList.forEach(name => {
+        const span = document.createElement('span');
+        span.className = "px-2 py-0.5 bg-[#00F5FF]/20 text-[#00F5FF] rounded border border-[#00F5FF]/50";
+        span.innerText = `✓ ${name}`;
+        listDiv.appendChild(span);
+      });
+    });
+
+    function triggerHostRematch() {
+      socket.emit('request_rematch');
+    }
+
+    socket.on('return_to_lobby', ({ roomCode, players, settings }) => {
+      document.getElementById('modal-debrief').classList.add('hidden');
+      document.getElementById('screen-game').classList.add('hidden');
+      document.getElementById('modal-invite').classList.remove('hidden');
+      STATE.isSpectating = false;
+      STATE.guardianUsesLeft = 1;
+      STATE.myCatches = 0;
+      STATE.connectedPlayers = players;
+      alert("🔄 Rematch triggered! Returning everyone to match lobby.");
+    });
+
+    // Voice & Chat Handlers
+    async function startVoice(e) {
+      if (e) e.preventDefault();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        STATE.mediaRecorder = new MediaRecorder(stream);
+        STATE.mediaRecorder.ondataavailable = (ev) => { socket.emit('voice_audio_chunk', ev.data); };
+        STATE.mediaRecorder.start(250);
+        document.getElementById('ptt-label').innerText = "TRANSMITTING";
+        document.getElementById('btn-ptt-mic').classList.add('bg-[#FF0055]', 'text-white');
+      } catch (err) {
+        document.getElementById('ptt-label').innerText = "MIC BLOCKED";
+      }
+    }
+
+    function stopVoice(e) {
+      if (e) e.preventDefault();
+      if (STATE.mediaRecorder && STATE.mediaRecorder.state !== 'inactive') {
+        STATE.mediaRecorder.stop();
+        document.getElementById('ptt-label').innerText = "PTT MIC";
+        document.getElementById('btn-ptt-mic').classList.remove('bg-[#FF0055]', 'text-white');
+      }
+    }
+
+    socket.on('receive_voice_chunk', ({ sender, audio }) => {
+      const blob = new Blob([audio], { type: 'audio/webm' });
+      const a = new Audio(URL.createObjectURL(blob));
+      a.play();
+    });
+
+    function toggleChatDrawer() { document.getElementById('drawer-chat').classList.toggle('hidden'); }
+    function handleSendChat(e) {
+      e.preventDefault();
+      const inp = document.getElementById('chat-text-input');
+      if (inp.value.trim()) {
+        socket.emit('send_chat', inp.value.trim());
+        inp.value = '';
+      }
+    }
+    socket.on('chat_message', ({ sender, role, text, time }) => {
+      const feed = document.getElementById('chat-feed');
+      const div = document.createElement('div');
+      div.className = "flex flex-col border-b border-gray-900 pb-1";
+      div.innerHTML = `<span class="text-[10px] text-gray-500">[${time}] <b class="text-[#CCFF00]">${sender}</b>:</span><span class="text-xs text-white">${text}</span>`;
+      feed.appendChild(div);
+      feed.scrollTop = feed.scrollHeight;
+    });
+
+    // Tasks & Camera
+    function toggleTasksDrawer() { document.getElementById('drawer-tasks').classList.toggle('hidden'); }
+    function renderTasksList() {
+      const feed = document.getElementById('tasks-feed');
+      feed.innerHTML = '';
+      STATE.myTasks.forEach(t => {
+        const item = document.createElement('div');
+        item.className = "p-2 bg-black border border-gray-800 rounded flex justify-between items-center text-xs";
+        item.innerHTML = `<div><div class="font-bold text-[#00F5FF]">${t.title}</div><div class="text-[10px] text-gray-400">${t.desc}</div></div>
+          ${t.completed ? '<span class="text-green-400 font-bold">✓ DONE</span>' : `<button onclick="openTaskCameraModal('${t.id}')" class="px-2 py-1 bg-[#00F5FF] text-black font-bold text-[10px] rounded">📸 SNAP</button>`}`;
+        feed.appendChild(item);
+      });
+    }
+
+    function openTaskCameraModal(id) {
+      STATE.activeTaskId = id;
+      const t = STATE.myTasks.find(x => x.id === id);
+      document.getElementById('modal-task-heading').innerText = t.title;
+      document.getElementById('photo-preview-element').classList.add('hidden');
+      document.getElementById('btn-submit-task').disabled = true;
+      document.getElementById('modal-camera').classList.remove('hidden');
+    }
+
+    function closeCameraModal() { document.getElementById('modal-camera').classList.add('hidden'); }
+
+    function handleTaskPhotoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        STATE.taskPhotoData = evt.target.result;
+        const img = document.getElementById('photo-preview-element');
+        img.src = evt.target.result;
+        img.classList.remove('hidden');
+        document.getElementById('btn-submit-task').disabled = false;
+        document.getElementById('btn-submit-task').className = "w-full py-2.5 bg-[#CCFF00] text-black font-bold text-xs uppercase rounded-xl";
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function confirmTaskCompletion() {
+      const t = STATE.myTasks.find(x => x.id === STATE.activeTaskId);
+      if (t) {
+        t.completed = true;
+        closeCameraModal();
+        renderTasksList();
+        socket.emit('submit_task_photo', {
+          taskId: t.id,
+          taskTitle: t.title,
+          photoData: STATE.taskPhotoData
+        });
+      }
+    }
+
+    function togglePowersDrawer() { document.getElementById('drawer-powers').classList.toggle('hidden'); }
+    function renderPowers() {
+      const feed = document.getElementById('powers-feed');
+      if (STATE.role === 'hider') {
+        feed.innerHTML = `
+          <button onclick="usePower('cloak')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#CCFF00]">GHOST CLOAK</div><div class="text-[9px] text-gray-400">Pulse immunity</div></button>
+          <button onclick="usePower('decoy')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#CCFF00]">DECOY PING</div><div class="text-[9px] text-gray-400">Fake marker 100m away</div></button>
+          <button onclick="usePower('sixthSense')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#CCFF00]">SIXTH SENSE</div><div class="text-[9px] text-gray-400">Directional threat alert</div></button>
+          <button onclick="usePower('smoke')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#CCFF00]">SMOKE HAZE</div><div class="text-[9px] text-gray-400">100m radar blur</div></button>`;
+      } else {
+        feed.innerHTML = `
+          <button onclick="socket.emit('trigger_pulse')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#FF0055]">UAV SWEEP</div><div class="text-[9px] text-gray-400">10s orbital reveal</div></button>
+          <button onclick="usePower('sonar')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#FF0055]">SONAR FLARE</div><div class="text-[9px] text-gray-400">70m acoustic scan</div></button>
+          <button onclick="usePower('overdrive')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#FF0055]">OVERDRIVE</div><div class="text-[9px] text-gray-400">+10m catch radius</div></button>
+          <button onclick="usePower('emp')" class="p-2 bg-black border border-gray-800 rounded text-left"><div class="font-bold text-[#FF0055]">EMP SCRAMBLER</div><div class="text-[9px] text-gray-400">Jam hider sensors 25s</div></button>`;
+      }
+    }
+    function usePower(type) { alert(`Activated ability: ${type.toUpperCase()}`); togglePowersDrawer(); }
+
+    function togglePlayersDrawer() { document.getElementById('drawer-players').classList.toggle('hidden'); }
+    function renderPlayersRoster() {
+      const feed = document.getElementById('players-roster-feed');
+      feed.innerHTML = '';
+      STATE.connectedPlayers.forEach(p => {
+        const item = document.createElement('div');
+        item.className = "p-1.5 bg-black/60 border border-gray-800 rounded flex justify-between items-center text-xs";
+        item.innerHTML = `<span>${p.callsign}</span><span class="${p.role === 'hider' ? 'text-[#CCFF00]' : 'text-[#FF0055]'} font-bold uppercase">${p.role}${p.isProtector ? ' (ANGEL)' : ''}</span>`;
+        feed.appendChild(item);
+      });
+    }
+  </script>
+</body>
+</html>
